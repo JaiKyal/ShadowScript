@@ -117,7 +117,7 @@ public class CaptureService {
                 hidden.complete(null);
             });
             hidden.get(1, TimeUnit.SECONDS); // wait for JavaFX to apply
-            Thread.sleep(150);               // let compositor render the change
+            Thread.sleep(150); // let compositor render the change
 
             BufferedImage img = robot.createScreenCapture(
                     new Rectangle(region.x(), region.y(), region.width(), region.height()));
