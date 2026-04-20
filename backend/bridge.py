@@ -1,6 +1,7 @@
 import base64
 import difflib
 import logging
+import re
 from contextlib import asynccontextmanager
 
 import cv2
@@ -20,6 +21,21 @@ log = logging.getLogger("shadowscript")
 
 USE_EASYOCR = False
 easy_reader = None
+
+# ---------------------------------------------------------------------------
+# Spell-checker (optional — degrades gracefully if not installed)
+# Install with: pip install pyspellchecker
+# ---------------------------------------------------------------------------
+try:
+    from spellchecker import SpellChecker
+    _spell = SpellChecker()
+    SPELLCHECK_AVAILABLE = True
+    log.info("pyspellchecker loaded — spell correction enabled.")
+except ImportError:
+    _spell = None
+    SPELLCHECK_AVAILABLE = False
+    log.warning("pyspellchecker not installed — skipping spell correction. "
+                "Run: pip install pyspellchecker")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -58,8 +74,8 @@ def decode_base64_to_cv2(b64_string: str) -> np.ndarray:
 def crop_caption_area(image: np.ndarray) -> np.ndarray:
     """Crop to caption band: 60%-95% vertically, skipping title bar and controls."""
     h, w = image.shape[:2]
-    top    = int(h * 0.60)
-    bottom = int(h * 0.95)
+    top    = int(h * 0.80)
+    bottom = int(h * 0.96)
     return image[top:bottom, 0:w]
 
 def preprocess(image: np.ndarray) -> np.ndarray:
@@ -96,14 +112,140 @@ def run_easyocr(image: np.ndarray) -> str:
 def extract_text(preprocessed: np.ndarray) -> str:
     return run_easyocr(preprocessed) if USE_EASYOCR else run_tesseract(preprocessed)
 
+
+def fix_ocr_artifacts(text: str) -> str:
+    r"""
+    Correct common OCR glyph-level misreads line by line.
+
+    Glyph rules (order matters):
+      1a. !' / /' / l' -> I'        contractions  (I'm, I'll, I've …)
+      1b. !x / /x      -> Ix        where x is a lowercase letter
+      1c. x!           -> x I       ! stuck to end of a normal word (if! -> if I)
+      1d. standalone ! / / / l -> I word surrounded by spaces or boundaries
+      2.  Collapse multiple spaces to one.
+      3.  Insert space after commas missing one (,\S -> , \S).
+      4.  CamelJoin split: lowercase immediately followed by uppercase -> insert space.
+
+    Manual word corrections applied before spellcheck:
+      Fixes words that the statistical spellchecker maps to the wrong target.
+    """
+    # ── Manual corrections: OCR misreads that spellcheck gets wrong ───────────
+    # Keys are lowercase; we restore capitalisation after.
+    _MANUAL = {
+        'stuay':    'study',
+        'stuaying': 'studying',
+        'stuayed':  'studied',
+        'stuays':   'studies',
+        'mede':     'made',
+        'heve':     'have',
+        'wes':      'was',
+        'beon':     'been',
+        'thet':     'that',
+        'whot':     'what',
+        'ond':      'and',
+        'thon':     'than',
+        'yeur':     'your',
+        'yoar':     'your',
+    }
+
+    lines_in  = text.split('\n')
+    lines_out = []
+
+    for line in lines_in:
+
+        # --- Rule 1a: contraction glyph -> I' ----------------------------
+        # Handles !'  /'  l'  all representing I' (I'm, I'll, I've …)
+        line = re.sub(r"[!/l]'", "I'", line)
+
+        # --- Rule 1b: glyph + lowercase letter -> I + letter -------------
+        # !t -> It,  /f -> If,  !n -> In  (but NOT l + letter inside words)
+        line = re.sub(r'[!/]([a-z])', lambda m: 'I' + m.group(1), line)
+
+        # --- Rule 1c: ! or / stuck to END of a normal word -> ' I' ------
+        # "if!" -> "if I",  "and/" -> "and I"
+        line = re.sub(r'(?<=[a-zA-Z])[!/](?=\s|$)', ' I', line)
+
+        # --- Rule 1d: standalone ! / / / l (word boundaries) -> I -------
+        # Preceded by start-of-string or whitespace; followed by space or end.
+        line = re.sub(r'(?:^|(?<=\s))[!/l](?=\s|$)', 'I', line)
+
+        # --- Rule 2: collapse runs of spaces to single space -------------
+        line = re.sub(r' {2,}', ' ', line).strip()
+
+        # --- Rule 3: fix missing space after comma -----------------------
+        line = re.sub(r',(?=\S)', ', ', line)
+
+        # --- Rule 4: CamelJoined words -> insert space ------------------
+        # "andI'm" -> "and I'm"   (lowercase immediately before uppercase)
+        line = re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', line)
+
+        # --- Manual word corrections (case-insensitive, preserves case) --
+        tokens = line.split(' ')
+        fixed_tokens = []
+        for tok in tokens:
+            lower = tok.lower().rstrip('.,!?;:')
+            if lower in _MANUAL:
+                replacement = _MANUAL[lower]
+                if tok[0].isupper():
+                    replacement = replacement.capitalize()
+                # Reattach trailing punctuation
+                trailing = tok[len(lower):]
+                fixed_tokens.append(replacement + trailing)
+            else:
+                fixed_tokens.append(tok)
+        line = ' '.join(fixed_tokens)
+
+        lines_out.append(line)
+
+    return '\n'.join(lines_out)
+
+
+
+# Tokens we must NEVER alter with spellcheck:
+#   - 2 chars or shorter  (too risky: 'is', 'in', 'do' get mangled)
+#   - contain non-alpha   (numbers, URLs, code, punctuation)
+#   - ALL-CAPS            (acronyms)
+_NON_ALPHA = re.compile(r'[^a-zA-Z]')
+
+def _should_spellcheck(token: str) -> bool:
+    return (
+        len(token) > 2
+        and not _NON_ALPHA.search(token)
+        and not token.isupper()
+    )
+
+
+def spellcheck_text(text: str) -> str:
+    """Correct misspelled alphabetic words; leaves numbers/symbols/code alone."""
+    if not SPELLCHECK_AVAILABLE:
+        return text
+    lines_out = []
+    for line in text.split('\n'):
+        tokens = line.split(' ')
+        fixed = []
+        for tok in tokens:
+            if not _should_spellcheck(tok):
+                fixed.append(tok)
+                continue
+            lower = tok.lower()
+            correction = _spell.correction(lower)
+            if correction and correction != lower:
+                # Mirror original capitalisation
+                correction = correction.capitalize() if tok[0].isupper() else correction
+                log.debug(f"[SPELL] {tok!r} -> {correction!r}")
+                fixed.append(correction)
+            else:
+                fixed.append(tok)
+        lines_out.append(' '.join(fixed))
+    return '\n'.join(lines_out)
+
 def clean_text(text: str) -> str:
-    import re
     lines = text.split('\n')
     # Drop lines shorter than 4 chars (noise / stray glyphs)
-    lines = [l for l in lines if len(l.strip()) > 4]
-    # Drop lines where more than half the chars are non-alphanumeric
+    lines = [l for l in lines if len(l.strip()) >= 7]
+    # Drop lines where more than 35% of the chars are non-alphanumeric
     lines = [l for l in lines
-             if len(re.sub(r'[^a-zA-Z0-9\s]', '', l)) > len(l) * 0.5]
+             if len(re.sub(r'[^a-zA-Z0-9\s]', '', l)) > len(l) * 0.65]
     return '\n'.join(lines).strip()
 
 def is_duplicate(new_text: str) -> bool:
@@ -119,7 +261,10 @@ async def process_frame(payload: FramePayload):
     image        = decode_base64_to_cv2(payload.image)
     image        = crop_caption_area(image)
     preprocessed = preprocess(image)
-    raw_text     = clean_text(extract_text(preprocessed))
+    raw_text     = extract_text(preprocessed)
+    raw_text     = fix_ocr_artifacts(raw_text)  # ! -> I, spacing fixes
+    raw_text     = spellcheck_text(raw_text)     # stuay -> study, etc.
+    raw_text     = clean_text(raw_text)
     if not raw_text:
         return JSONResponse(content={"text": "", "duplicate": False})
     if is_duplicate(raw_text):

@@ -33,11 +33,13 @@ import java.util.List;
 public class SniperOverlay extends Application {
 
     // ── Status Enum ──────────────────────────────────────────────────────────
-    public enum Status { IDLE, CAPTURING, PROCESSING, ERROR }
+    public enum Status {
+        IDLE, CAPTURING, PROCESSING, ERROR
+    }
 
     // ── Drag / Resize state ───────────────────────────────────────────────────
     private static final double HANDLE_SIZE = 12.0;
-    private static final double MIN_SIZE    = 120.0;
+    private static final double MIN_SIZE = 120.0;
 
     private double dragStartX, dragStartY;
     private double dragStageX, dragStageY;
@@ -49,8 +51,8 @@ public class SniperOverlay extends Application {
     private CaptureService captureService;
     private final List<String> textBuffer = Collections.synchronizedList(new ArrayList<>());
 
-    private Label     statusDot;
-    private TextArea  ocrTextArea;
+    private Label statusDot;
+    private TextArea ocrTextArea;
 
     // ═════════════════════════════════════════════════════════════════════════
     @Override
@@ -111,13 +113,14 @@ public class SniperOverlay extends Application {
         // ── Close button (top-right) ───────────────────────────────────────────
         Button closeBtn = new Button("✕");
         closeBtn.setStyle("-fx-text-fill: #888888; -fx-background-color: transparent; " +
-                          "-fx-font-size: 13px; -fx-cursor: hand; -fx-padding: 2 6 2 6;");
+                "-fx-font-size: 13px; -fx-cursor: hand; -fx-padding: 2 6 2 6;");
         closeBtn.setOnMouseEntered(e -> closeBtn.setStyle(closeBtn.getStyle()
                 .replace("-fx-text-fill: #888888", "-fx-text-fill: #FF4C4C")));
         closeBtn.setOnMouseExited(e -> closeBtn.setStyle(closeBtn.getStyle()
                 .replace("-fx-text-fill: #FF4C4C", "-fx-text-fill: #888888")));
         closeBtn.setOnAction(e -> {
-            if (captureService != null) captureService.stop();
+            if (captureService != null)
+                captureService.stop();
             Platform.exit();
         });
 
@@ -132,24 +135,22 @@ public class SniperOverlay extends Application {
         ocrTextArea.setWrapText(true);
         ocrTextArea.setId("ocrArea");
         ocrTextArea.setStyle(
-            "-fx-control-inner-background: transparent; " +
-            "-fx-background-color: transparent; " +
-            "-fx-text-fill: #e0e0e0; " +
-            "-fx-font-family: 'Consolas', monospace; " +
-            "-fx-font-size: 12px; " +
-            "-fx-highlight-fill: #00F5FF; " +
-            "-fx-highlight-text-fill: #000000;"
-        );
+                "-fx-control-inner-background: transparent; " +
+                        "-fx-background-color: transparent; " +
+                        "-fx-text-fill: #e0e0e0; " +
+                        "-fx-font-family: 'Consolas', monospace; " +
+                        "-fx-font-size: 12px; " +
+                        "-fx-highlight-fill: #00F5FF; " +
+                        "-fx-highlight-text-fill: #000000;");
 
         // ── Root ───────────────────────────────────────────────────────────────
         VBox root = new VBox(topBar, ocrTextArea);
         VBox.setVgrow(ocrTextArea, Priority.ALWAYS);
         root.setStyle(
-            "-fx-border-color: #00F5FF; " +
-            "-fx-border-width: 2px; " +
-            "-fx-border-style: solid; " +
-            "-fx-background-color: rgba(10,12,20,0.15);"
-        );
+                "-fx-border-color: #00F5FF; " +
+                        "-fx-border-width: 2px; " +
+                        "-fx-border-style: solid; " +
+                        "-fx-background-color: rgba(10,12,20,0.15);");
 
         // ── Neon glow ──────────────────────────────────────────────────────────
         DropShadow glow = new DropShadow();
@@ -171,8 +172,8 @@ public class SniperOverlay extends Application {
         stage.setScene(scene);
 
         Rectangle2D bounds = Screen.getPrimary().getVisualBounds();
-        stage.setX((bounds.getWidth()  - 800) / 2);
-        stage.setY(bounds.getHeight() - 160);   // near bottom — over caption bar
+        stage.setX((bounds.getWidth() - 800) / 2);
+        stage.setY(bounds.getHeight() - 160); // near bottom — over caption bar
         stage.show();
 
         // JavaFX TextArea wraps an internal ScrollPane that ignores inline CSS.
@@ -182,9 +183,8 @@ public class SniperOverlay extends Application {
             javafx.scene.Node scrollPane = ocrTextArea.lookup(".scroll-pane");
             if (scrollPane != null) {
                 scrollPane.setStyle(
-                    "-fx-background: transparent; " +
-                    "-fx-background-color: transparent;"
-                );
+                        "-fx-background: transparent; " +
+                                "-fx-background-color: transparent;");
             }
             javafx.scene.Node viewport = ocrTextArea.lookup(".scroll-pane .viewport");
             if (viewport != null) {
@@ -200,10 +200,10 @@ public class SniperOverlay extends Application {
     public void setStatus(Status s) {
         Platform.runLater(() -> {
             String color = switch (s) {
-                case IDLE       -> "#888888";
-                case CAPTURING  -> "#00F5FF";
+                case IDLE -> "#888888";
+                case CAPTURING -> "#00F5FF";
                 case PROCESSING -> "#FFD700";
-                case ERROR      -> "#FF4C4C";
+                case ERROR -> "#FF4C4C";
             };
             statusDot.setStyle("-fx-text-fill: " + color + "; -fx-font-size: 13px;");
         });
@@ -212,9 +212,8 @@ public class SniperOverlay extends Application {
     // ── Export helpers ────────────────────────────────────────────────────────
     private void styleExportBtn(Button btn) {
         btn.setStyle(
-            "-fx-text-fill: #888888; -fx-background-color: transparent; " +
-            "-fx-font-size: 11px; -fx-cursor: hand; -fx-padding: 2 6 2 6;"
-        );
+                "-fx-text-fill: #888888; -fx-background-color: transparent; " +
+                        "-fx-font-size: 11px; -fx-cursor: hand; -fx-padding: 2 6 2 6;");
         btn.setOnMouseEntered(e -> btn.setStyle(btn.getStyle()
                 .replace("-fx-text-fill: #888888", "-fx-text-fill: #00F5FF")));
         btn.setOnMouseExited(e -> btn.setStyle(btn.getStyle()
@@ -223,9 +222,10 @@ public class SniperOverlay extends Application {
 
     private void exportDocx() {
         File file = chooseFile("Save as DOCX", "Word Document (*.docx)", "*.docx");
-        if (file == null) return;
+        if (file == null)
+            return;
         try (XWPFDocument doc = new XWPFDocument();
-             FileOutputStream out = new FileOutputStream(file)) {
+                FileOutputStream out = new FileOutputStream(file)) {
             String[] lines = ocrTextArea.getText().split("\n");
             for (String line : lines) {
                 XWPFParagraph para = doc.createParagraph();
@@ -242,10 +242,11 @@ public class SniperOverlay extends Application {
 
     private void exportPdf() {
         File file = chooseFile("Save as PDF", "PDF Document (*.pdf)", "*.pdf");
-        if (file == null) return;
+        if (file == null)
+            return;
         try (PdfWriter writer = new PdfWriter(file);
-             PdfDocument pdf = new PdfDocument(writer);
-             Document doc = new Document(pdf)) {
+                PdfDocument pdf = new PdfDocument(writer);
+                Document doc = new Document(pdf)) {
             String[] lines = ocrTextArea.getText().split("\n");
             for (String line : lines) {
                 doc.add(new Paragraph(line));
@@ -270,8 +271,8 @@ public class SniperOverlay extends Application {
             alert.setTitle("Saved!");
             alert.setHeaderText(null);
             alert.setContentText(
-                "✅ Saved! You can now paste this file into ChatGPT, Claude, or Gemini manually.\n\nPath: " + file.getAbsolutePath()
-            );
+                    "✅ Saved! You can now paste this file into ChatGPT, Claude, or Gemini manually.\n\nPath: "
+                            + file.getAbsolutePath());
             alert.showAndWait();
         });
     }
@@ -290,22 +291,20 @@ public class SniperOverlay extends Application {
     private void safeInitCaptureService() {
         try {
             captureService = new CaptureService(
-                this::getCaptureRegion,
-                text -> {
-                    textBuffer.add(text);
-                    Platform.runLater(() -> {
-                        ocrTextArea.appendText(text + "\n");
-                        ocrTextArea.setScrollTop(Double.MAX_VALUE);
-                    });
-                },
-                error -> {
-                    setStatus(Status.ERROR);
-                    Platform.runLater(() ->
-                        ocrTextArea.appendText("[ERROR] " + error.getMessage() + "\n")
-                    );
-                },
-                this::setStatus,
-                primaryStage   // ← for hide-during-capture
+                    this::getCaptureRegion,
+                    text -> {
+                        textBuffer.add(text);
+                        Platform.runLater(() -> {
+                            ocrTextArea.appendText(text + "\n");
+                            ocrTextArea.setScrollTop(Double.MAX_VALUE);
+                        });
+                    },
+                    error -> {
+                        setStatus(Status.ERROR);
+                        Platform.runLater(() -> ocrTextArea.appendText("[ERROR] " + error.getMessage() + "\n"));
+                    },
+                    this::setStatus,
+                    primaryStage // ← for hide-during-capture
             );
             captureService.start();
         } catch (Throwable e) {
@@ -320,9 +319,8 @@ public class SniperOverlay extends Application {
         // Never use the overlay's own bounds (it would photograph itself).
         Rectangle2D b = Screen.getPrimary().getVisualBounds();
         return new CaptureService.FrameRegion(
-            (int) b.getMinX(), (int) b.getMinY(),
-            (int) b.getWidth(), (int) b.getHeight()
-        );
+                (int) b.getMinX(), (int) b.getMinY(),
+                (int) b.getWidth(), (int) b.getHeight());
     }
 
     // ── Drag / resize handlers ────────────────────────────────────────────────
@@ -333,10 +331,13 @@ public class SniperOverlay extends Application {
         });
 
         root.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
-            dragStartX = e.getScreenX();  dragStartY = e.getScreenY();
-            dragStageX = primaryStage.getX(); dragStageY = primaryStage.getY();
-            dragStageW = primaryStage.getWidth(); dragStageH = primaryStage.getHeight();
-            resizeDir  = getResizeDir(e.getX(), e.getY(), root.getWidth(), root.getHeight());
+            dragStartX = e.getScreenX();
+            dragStartY = e.getScreenY();
+            dragStageX = primaryStage.getX();
+            dragStageY = primaryStage.getY();
+            dragStageW = primaryStage.getWidth();
+            dragStageH = primaryStage.getHeight();
+            resizeDir = getResizeDir(e.getX(), e.getY(), root.getWidth(), root.getHeight());
         });
 
         root.addEventFilter(MouseEvent.MOUSE_DRAGGED, e -> {
@@ -354,32 +355,65 @@ public class SniperOverlay extends Application {
     private ResizeDirection getResizeDir(double x, double y, double w, double h) {
         boolean L = x < HANDLE_SIZE, R = x > w - HANDLE_SIZE;
         boolean T = y < HANDLE_SIZE, B = y > h - HANDLE_SIZE;
-        if (!L && !R && !T && !B) return ResizeDirection.NONE;
-        if (T && L) return ResizeDirection.NW;
-        if (T && R) return ResizeDirection.NE;
-        if (B && L) return ResizeDirection.SW;
-        if (B && R) return ResizeDirection.SE;
-        if (T) return ResizeDirection.N;
-        if (B) return ResizeDirection.S;
-        if (L) return ResizeDirection.W;
+        if (!L && !R && !T && !B)
+            return ResizeDirection.NONE;
+        if (T && L)
+            return ResizeDirection.NW;
+        if (T && R)
+            return ResizeDirection.NE;
+        if (B && L)
+            return ResizeDirection.SW;
+        if (B && R)
+            return ResizeDirection.SE;
+        if (T)
+            return ResizeDirection.N;
+        if (B)
+            return ResizeDirection.S;
+        if (L)
+            return ResizeDirection.W;
         return ResizeDirection.E;
     }
 
     private void applyResize(double dx, double dy) {
         double nX = dragStageX, nY = dragStageY, nW = dragStageW, nH = dragStageH;
         switch (resizeDir) {
-            case E  -> nW = Math.max(MIN_SIZE, dragStageW + dx);
-            case S  -> nH = Math.max(MIN_SIZE, dragStageH + dy);
-            case W  -> { nX = dragStageX + dx; nW = Math.max(MIN_SIZE, dragStageW - dx); }
-            case N  -> { nY = dragStageY + dy; nH = Math.max(MIN_SIZE, dragStageH - dy); }
-            case SE -> { nW = Math.max(MIN_SIZE, dragStageW + dx); nH = Math.max(MIN_SIZE, dragStageH + dy); }
-            case SW -> { nX = dragStageX + dx; nW = Math.max(MIN_SIZE, dragStageW - dx); nH = Math.max(MIN_SIZE, dragStageH + dy); }
-            case NE -> { nW = Math.max(MIN_SIZE, dragStageW + dx); nY = dragStageY + dy; nH = Math.max(MIN_SIZE, dragStageH - dy); }
-            case NW -> { nX = dragStageX + dx; nW = Math.max(MIN_SIZE, dragStageW - dx); nY = dragStageY + dy; nH = Math.max(MIN_SIZE, dragStageH - dy); }
-            default -> {}
+            case E -> nW = Math.max(MIN_SIZE, dragStageW + dx);
+            case S -> nH = Math.max(MIN_SIZE, dragStageH + dy);
+            case W -> {
+                nX = dragStageX + dx;
+                nW = Math.max(MIN_SIZE, dragStageW - dx);
+            }
+            case N -> {
+                nY = dragStageY + dy;
+                nH = Math.max(MIN_SIZE, dragStageH - dy);
+            }
+            case SE -> {
+                nW = Math.max(MIN_SIZE, dragStageW + dx);
+                nH = Math.max(MIN_SIZE, dragStageH + dy);
+            }
+            case SW -> {
+                nX = dragStageX + dx;
+                nW = Math.max(MIN_SIZE, dragStageW - dx);
+                nH = Math.max(MIN_SIZE, dragStageH + dy);
+            }
+            case NE -> {
+                nW = Math.max(MIN_SIZE, dragStageW + dx);
+                nY = dragStageY + dy;
+                nH = Math.max(MIN_SIZE, dragStageH - dy);
+            }
+            case NW -> {
+                nX = dragStageX + dx;
+                nW = Math.max(MIN_SIZE, dragStageW - dx);
+                nY = dragStageY + dy;
+                nH = Math.max(MIN_SIZE, dragStageH - dy);
+            }
+            default -> {
+            }
         }
-        primaryStage.setX(nX); primaryStage.setY(nY);
-        primaryStage.setWidth(nW); primaryStage.setHeight(nH);
+        primaryStage.setX(nX);
+        primaryStage.setY(nY);
+        primaryStage.setWidth(nW);
+        primaryStage.setHeight(nH);
     }
 
     // ── ResizeDirection ───────────────────────────────────────────────────────
@@ -391,8 +425,13 @@ public class SniperOverlay extends Application {
         SE(javafx.scene.Cursor.SE_RESIZE), SW(javafx.scene.Cursor.SW_RESIZE);
 
         final javafx.scene.Cursor cursor;
-        ResizeDirection(javafx.scene.Cursor c) { this.cursor = c; }
+
+        ResizeDirection(javafx.scene.Cursor c) {
+            this.cursor = c;
+        }
     }
 
-    public static void main(String[] args) { launch(args); }
+    public static void main(String[] args) {
+        launch(args);
+    }
 }
